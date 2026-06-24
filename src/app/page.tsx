@@ -1,65 +1,84 @@
-import Image from "next/image";
-
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-[#0b1220] text-white flex flex-col items-center justify-center px-6">
+      
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-4xl font-bold tracking-wide">
+          RedSea Ledger
+        </h1>
+
+        <p className="mt-3 text-gray-400 max-w-md">
+          Maritime Intelligence Platform for AIS tracking, port congestion prediction,
+          anomaly detection, and blockchain document verification.
+        </p>
+      </div>
+
+      {/* Status Card */}
+      <div className="mt-10 bg-[#162033] border border-[#24324a] rounded-2xl p-6 w-full max-w-md">
+        <h2 className="text-lg font-semibold mb-3">
+          System Status
+        </h2>
+
+        <div className="space-y-2 text-sm text-gray-300">
+          <div className="flex justify-between">
+            <span>Frontend</span>
+            <span className="text-green-400">● Online</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span>API Connection</span>
+            <span className="text-yellow-400">● Pending</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span>AIS Stream</span>
+            <span className="text-red-400">● Disconnected</span>
+          </div>
+
+          <div className="flex justify-between">
+            <span>AI Engine</span>
+            <span className="text-red-400">● Idle</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+
+      {/* Navigation */}
+      <div className="mt-10 grid grid-cols-2 gap-4 w-full max-w-md">
+        <a
+          href="/dashboard/overview"
+          className="bg-[#162033] hover:bg-[#1d2a44] transition p-4 rounded-xl text-center"
+        >
+          Overview
+        </a>
+
+        <a
+          href="/dashboard/vessels"
+          className="bg-[#162033] hover:bg-[#1d2a44] transition p-4 rounded-xl text-center"
+        >
+          Live Vessels
+        </a>
+
+        <a
+          href="/dashboard/ports"
+          className="bg-[#162033] hover:bg-[#1d2a44] transition p-4 rounded-xl text-center"
+        >
+          Ports
+        </a>
+
+        <a
+          href="/dashboard/documents"
+          className="bg-[#162033] hover:bg-[#1d2a44] transition p-4 rounded-xl text-center"
+        >
+          Documents
+        </a>
+      </div>
+
+      {/* Footer */}
+      <p className="mt-12 text-xs text-gray-600">
+        Edge-enabled maritime intelligence system
+      </p>
+
     </div>
-  );
+  )
 }
