@@ -2,6 +2,6 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "devCommand": "next dev --webpack",
-  "installCommand": "pnpm install",
+  "installCommand": "npm install",
   "outputDirectory": ".next"
 }
