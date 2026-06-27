@@ -1,4 +1,4 @@
-import { startMockAIS } from "./aisMockServer.ts"
+import { startMockAIS } from "./aisMockServer"
 
 console.log("🚀 Starting AIS Mock Runner...")
 
