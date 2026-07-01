@@ -7,13 +7,17 @@ export type Vessel = {
   speed: number
   heading: number
   timestamp?: number
+  name?: string
+  vesselType?: string
+  flagState?: string
+  destination?: string
 }
 
 type VesselState = {
   vessels: Record<string, Vessel>
 
-  // core actions
   updateVessel: (vessel: Vessel) => void
+  updateVesselStatic: (mmsi: string, patch: Partial<Pick<Vessel, "name" | "vesselType" | "flagState" | "destination">>) => void
   setVessels: (vessels: Vessel[]) => void
   clearVessels: () => void
 }
@@ -21,43 +25,37 @@ type VesselState = {
 export const useVesselStore = create<VesselState>((set) => ({
   vessels: {},
 
-  /**
-   * Update single vessel (real-time AIS stream)
-   */
   updateVessel: (vessel) =>
-    set((state) => {
-      const existing = state.vessels[vessel.mmsi]
+    set((state) => ({
+      vessels: {
+        ...state.vessels,
+        [vessel.mmsi]: {
+          ...state.vessels[vessel.mmsi],
+          ...vessel,
+          timestamp: Date.now(),
+        },
+      },
+    })),
 
+  updateVesselStatic: (mmsi, patch) =>
+    set((state) => {
+      const existing = state.vessels[mmsi]
+      if (!existing) return state
       return {
         vessels: {
           ...state.vessels,
-          [vessel.mmsi]: {
-            ...existing,
-            ...vessel,
-            timestamp: Date.now(),
-          },
+          [mmsi]: { ...existing, ...patch },
         },
       }
     }),
 
-  /**
-   * Bulk replace vessels (useful for initial load / reset)
-   */
   setVessels: (vessels) => {
     const map: Record<string, Vessel> = {}
-
     for (const v of vessels) {
-      map[v.mmsi] = {
-        ...v,
-        timestamp: Date.now(),
-      }
+      map[v.mmsi] = { ...v, timestamp: Date.now() }
     }
-
     set({ vessels: map })
   },
 
-  /**
-   * Clear all vessels (useful for reconnect / reset)
-   */
   clearVessels: () => set({ vessels: {} }),
 }))

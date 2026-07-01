@@ -1,5 +1,3 @@
-
-
 import { useEffect, useRef } from "react"
 import { useVesselStore } from "@/store/useVesselStore"
 import { useSecurityStore } from "@/store/useSecurityStore"
@@ -11,35 +9,49 @@ import {
   persistPosition,
   persistSanctionsHit,
 } from "@/lib/supabase/persistence"
+import { mmsiToCountry, vesselTypeLabel } from "@/lib/ais/midCodes"
 
-const AISSTREAM_URL = "wss://stream.aisstream.io/v0/stream"
-const AISSTREAM_API_KEY = import.meta.env.VITE_AISSTREAM_API_KEY || ""
-const BOUNDING_BOXES = [[[-90, -180], [90, 180]]]
+const PROXY_URL = (() => {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:"
+  return `${proto}//${location.host}/api/ais-stream`
+})()
+
+const DIRECT_URL = "wss://stream.aisstream.io/v0/stream"
+const DIRECT_API_KEY = import.meta.env.VITE_AISSTREAM_API_KEY || ""
 
 export const useSecureAISStream = () => {
   const updateVessel = useVesselStore((s) => s.updateVessel)
+  const updateVesselStatic = useVesselStore((s) => s.updateVesselStatic)
   const { upsertThreatProfile, upsertIntelligence, addViolation } = useSecurityStore()
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
-    if (!AISSTREAM_API_KEY) {
-      console.error("❌ VITE_AISSTREAM_API_KEY missing")
-      return
-    }
-
     let reconnectTimeout: ReturnType<typeof setTimeout>
+    let useProxy = true
 
     const connect = () => {
-      const ws = new WebSocket(AISSTREAM_URL)
+      const url = useProxy ? PROXY_URL : DIRECT_URL
+      const ws = new WebSocket(url)
       wsRef.current = ws
 
+      const connectTimeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.warn("⚠️ Proxy timeout — falling back to direct AIS stream")
+          ws.close()
+          useProxy = false
+        }
+      }, 4000)
+
       ws.onopen = () => {
-        console.log("✅ aisstream.io connected")
-        ws.send(JSON.stringify({
-          APIKey: AISSTREAM_API_KEY,
-          BoundingBoxes: BOUNDING_BOXES,
-          FilterMessageTypes: ["PositionReport"],
-        }))
+        clearTimeout(connectTimeout)
+        console.log(`✅ AIS stream connected (${useProxy ? "proxy" : "direct"})`)
+        if (!useProxy) {
+          ws.send(JSON.stringify({
+            APIKey: DIRECT_API_KEY,
+            BoundingBoxes: [[[-90, -180], [90, 180]]],
+            FilterMessageTypes: ["PositionReport", "ShipStaticData"],
+          }))
+        }
       }
 
       ws.onmessage = async (event) => {
@@ -48,13 +60,32 @@ export const useSecureAISStream = () => {
             ? await event.data.text()
             : event.data
           const raw = JSON.parse(text)
-          if (raw.MessageType !== "PositionReport") return
+
+          const messageType: string = raw.MessageType
+          const meta = raw.MetaData
+          if (!meta) return
+
+          const mmsi = String(meta.MMSI)
+
+          if (messageType === "ShipStaticData") {
+            const s = raw.Message?.ShipStaticData
+            if (!s) return
+            const typeCode = Number(s.TypeOfShipAndCargoType ?? 0)
+            const flagState = mmsiToCountry(mmsi)
+            updateVesselStatic(mmsi, {
+              name: s.Name?.trim() || undefined,
+              vesselType: vesselTypeLabel(typeCode),
+              flagState,
+              destination: s.Destination?.trim() || undefined,
+            })
+            return
+          }
+
+          if (messageType !== "PositionReport") return
 
           const pos = raw.Message?.PositionReport
-          const meta = raw.MetaData
-          if (!pos || !meta) return
+          if (!pos) return
 
-          const mmsi = String(meta.MMSI || pos.UserID)
           const vessel = {
             mmsi,
             name: meta.ShipName?.trim() || mmsi,
@@ -63,23 +94,20 @@ export const useSecureAISStream = () => {
             speed: pos.Sog ?? 0,
             heading: pos.TrueHeading !== 511 ? (pos.TrueHeading ?? pos.Cog ?? 0) : (pos.Cog ?? 0),
             timestamp: Date.now(),
+            flagState: mmsiToCountry(mmsi),
           }
 
           if (vessel.lat === 0 && vessel.lon === 0) return
 
-          // 1. Update in-memory vessel store
           updateVessel(vessel)
 
-          // 2. Threat evaluation
           const threatProfile = evaluateVesselThreat(vessel)
           upsertThreatProfile(threatProfile)
 
-          // 3. Persist threat profile to Supabase (throttled inside persistThreatProfile)
           if (threatProfile.threatLevel !== "CLEAN") {
             persistThreatProfile(threatProfile, vessel.lat, vessel.lon, vessel.speed, vessel.heading, vessel.name)
           }
 
-          // 4. Log HIGH/CRITICAL violations → memory + DB
           for (const flag of threatProfile.flags) {
             if (flag.severity === "HIGH" || flag.severity === "CRITICAL") {
               addViolation({ clientId: mmsi, detail: `[${flag.severity}] ${flag.code}: ${flag.description}`, timestamp: Date.now() })
@@ -87,7 +115,6 @@ export const useSecureAISStream = () => {
             }
           }
 
-          // 5. Intelligence enrichment + sanctions persistence
           const intel = enrichVesselIntelligence(mmsi, vessel.name)
           upsertIntelligence(intel)
 
@@ -95,7 +122,6 @@ export const useSecureAISStream = () => {
             persistSanctionsHit(mmsi, vessel.name, hit)
           }
 
-          // 6. Position history (throttled to 1/min per vessel inside persistPosition)
           persistPosition({ mmsi, lat: vessel.lat, lon: vessel.lon, speed: vessel.speed, heading: vessel.heading })
 
         } catch (err) {
@@ -103,7 +129,12 @@ export const useSecureAISStream = () => {
         }
       }
 
-      ws.onerror = (err) => console.error("❌ AIS WebSocket error:", err)
+      ws.onerror = () => {
+        if (useProxy) {
+          console.warn("⚠️ AIS proxy error — will retry direct")
+          useProxy = false
+        }
+      }
       ws.onclose = (e) => {
         console.warn(`⚠️ AIS stream closed (${e.code}) — reconnecting in 5s`)
         reconnectTimeout = setTimeout(connect, 5000)
@@ -112,5 +143,5 @@ export const useSecureAISStream = () => {
 
     connect()
     return () => { clearTimeout(reconnectTimeout); wsRef.current?.close() }
-  }, [updateVessel, upsertThreatProfile, upsertIntelligence, addViolation])
+  }, [updateVessel, updateVesselStatic, upsertThreatProfile, upsertIntelligence, addViolation])
 }
