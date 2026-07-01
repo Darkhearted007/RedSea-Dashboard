@@ -112,7 +112,9 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
+  // NativeTabs only works on physical iOS 26+ devices — not on web or Android.
+  // Always use ClassicTabLayout on non-native platforms to avoid a blank screen.
+  if (Platform.OS !== "web" && Platform.OS !== "android" && isLiquidGlassAvailable()) {
     return <NativeTabLayout />;
   }
   return <ClassicTabLayout />;
