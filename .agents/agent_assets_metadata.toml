@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "mD2DHGMODnKVd3JfTZz_X"
+uri = "file://artifacts/redsea-dashboard-mobile/assets/images/icon.png"
+type = "image"
+title = "redsea-ledger-mobile-icon"

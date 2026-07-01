@@ -1,0 +1,3 @@
+- [Mobile artifact registration](mobile-artifact-registration.md) — createArtifact fails if directory exists; back up files, delete dir, re-run, restore files.
+- [react-native-maps version](react-native-maps-pin.md) — must pin to exactly 1.18.0 in package.json; do NOT add to app.json plugins.
+- [Mobile AIS stream](mobile-ais-stream.md) — uses native WebSocket globally; env var is EXPO_PUBLIC_AISSTREAM_API_KEY; graceful no-key empty state required.
