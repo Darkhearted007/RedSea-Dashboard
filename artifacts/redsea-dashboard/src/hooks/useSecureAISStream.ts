@@ -44,7 +44,10 @@ export const useSecureAISStream = () => {
 
       ws.onmessage = async (event) => {
         try {
-          const raw = JSON.parse(event.data)
+          const text = event.data instanceof Blob
+            ? await event.data.text()
+            : event.data
+          const raw = JSON.parse(text)
           if (raw.MessageType !== "PositionReport") return
 
           const pos = raw.Message?.PositionReport

@@ -1,0 +1,47 @@
+The Build
+Setting Up the Map
+Mapbox GL JS was the obvious choice for the map. It handles hundreds of thousands of markers efficiently using WebGL rendering, supports custom styling, and has great documentation.
+
+The key architectural decision was using a GeoJSON source with a symbol layer instead of individual DOM markers. When you have 10,000 ships on screen, individual markers would destroy performance. GeoJSON layers let Mapbox handle all rendering on the GPU.
+
+Each ship became a directional triangle — a small arrow pointing in its direction of travel, colored by vessel type. Tankers are red. Cargo ships are green. Container ships are blue. Passenger vessels are purple. The colors make it instantly clear what kind of traffic is moving where.
+
+The WebSocket Challenge
+This is where things got interesting.
+
+My first attempt connected directly from the browser to aisstream.io’s WebSocket endpoint. It kept failing with connection error 1006 — a silent, unhelpful error code that just means “something went wrong.”
+
+After significant debugging, I discovered two separate issues. First, aisstream.io uses HTTP/2 for its WebSocket upgrade, which some browsers and network configurations handle inconsistently. Second, my API key wasn’t being correctly passed to the Web Worker handling the connection, because Web Workers can’t directly access Vite’s import.meta.env environment variables.
+
+The solution was a Node.js proxy server. The browser connects to my proxy via WebSocket. The proxy connects to aisstream.io. The proxy handles the HTTP/2 negotiation, passes the API key correctly from environment variables, and forwards all AIS messages to the browser. Clean separation of concerns, and it solved both problems at once.
+
+The Data Pipeline
+AIS data comes in two message types. PositionReport messages arrive every few seconds and contain latitude, longitude, speed, heading, and MMSI — the unique vessel identifier. ShipStaticData messages arrive less frequently and contain the vessel name, type, destination, and call sign.
+
+Get Anjaligupta’s stories in your inbox
+Join Medium for free to get updates from this writer.
+
+Enter your email
+Subscribe
+
+Remember me for faster sign in
+
+The browser receives both message types and merges them by MMSI into a ship state map. Every second, that map gets converted to a GeoJSON FeatureCollection and pushed to Mapbox to update the visualization.
+
+At peak, the app processes over 50,000 AIS messages per hour.
+
+Building the Supabase Cache
+The live stream is great once it’s running, but it starts from zero every time someone loads the page. A new visitor would see an empty map for the first minute while ships accumulated.
+
+The solution was Supabase. Every 30 seconds, the proxy server batches all received ship positions and upserts them into a PostgreSQL table using MMSI as the primary key. When a user loads the app, it first fetches the latest 10,000+ ship positions from Supabase, populates the map instantly, and then the live-stream layers update on top.
+
+Load time went from “wait 60 seconds to see anything” to “see 10,000 ships in under 2 seconds.”
+
+The Filters
+A map with 10,000 undifferentiated dots isn’t very useful. I built a filter panel that lets users narrow down by:
+
+Ship type — tankers, cargo ships, container ships, bulk carriers, passenger vessels, fishing boats
+Flag country — derived from the first three digits of each ship’s MMSI number, which encode the vessel’s country of registration
+Minimum speed — filter out anchored vessels and see only ships actively underway
+Known destination — show only ships that have broadcast a destination port
+The country derivation was particularly interesting. The Maritime Mobile Service Identity system assigns three-digit country codes — called MID codes — to every nation. The Netherlands is 244–246. Panama is 351–357. The Marshall Islands is 538. By parsing the first three digits of any MMSI, you can identify where a ship is registered without any additional data.

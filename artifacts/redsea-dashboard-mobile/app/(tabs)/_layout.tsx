@@ -21,7 +21,7 @@ function NativeTabLayout() {
         <Label>Vessels</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="ports">
-        <Icon sf={{ default: "anchor", selected: "anchor" }} />
+        <Icon sf={{ default: "mappin.and.ellipse", selected: "mappin.and.ellipse" }} />
         <Label>Ports</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="documents">
@@ -89,7 +89,7 @@ function ClassicTabLayout() {
           title: "Ports",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="anchor" tintColor={color} size={22} />
+              <SymbolView name="mappin.and.ellipse" tintColor={color} size={22} />
             ) : (
               <Feather name="anchor" size={22} color={color} />
             ),
