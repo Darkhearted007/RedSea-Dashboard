@@ -8,6 +8,7 @@ import {
   persistThreatProfile,
   persistPosition,
   persistSanctionsHit,
+  fetchAllVesselProfiles,
 } from "@/lib/supabase/persistence"
 import { mmsiToCountry, vesselTypeLabel } from "@/lib/ais/midCodes"
 
@@ -22,8 +23,36 @@ const DIRECT_API_KEY = import.meta.env.VITE_AISSTREAM_API_KEY || ""
 export const useSecureAISStream = () => {
   const updateVessel = useVesselStore((s) => s.updateVessel)
   const updateVesselStatic = useVesselStore((s) => s.updateVesselStatic)
+  const setVessels = useVesselStore((s) => s.setVessels)
   const { upsertThreatProfile, upsertIntelligence, addViolation } = useSecurityStore()
   const wsRef = useRef<WebSocket | null>(null)
+
+  // ── Hydrate from Supabase on mount ────────────────────────────────────────
+  useEffect(() => {
+    fetchAllVesselProfiles().then((rows) => {
+      if (!rows.length) return
+      // Populate vessel store with seeded/persisted positions
+      setVessels(rows.map((r: any) => ({
+        mmsi:     r.mmsi,
+        name:     r.vessel_name || r.mmsi,
+        lat:      r.last_lat  ?? 0,
+        lon:      r.last_lon  ?? 0,
+        speed:    r.last_speed   ?? 0,
+        heading:  r.last_heading ?? 0,
+        flagState: mmsiToCountry(r.mmsi),
+      })))
+      // Populate threat profiles
+      for (const r of rows) {
+        upsertThreatProfile({
+          mmsi:        r.mmsi,
+          threatLevel: r.threat_level ?? "CLEAN",
+          score:       r.score ?? 0,
+          flags:       r.flags ?? [],
+        })
+      }
+      console.log(`✅ Hydrated ${rows.length} vessels from Supabase`)
+    }).catch((err: unknown) => console.warn("⚠️ Supabase hydration failed:", err))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let reconnectTimeout: ReturnType<typeof setTimeout>

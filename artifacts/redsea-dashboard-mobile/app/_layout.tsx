@@ -36,10 +36,25 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  // On web: render immediately — CDN may be unreachable in the Replit sandbox
-  // so useFonts may never resolve. System fonts are used as a fallback.
-  // On native: wait up to 3s then render anyway to avoid a permanent blank screen.
   const isWeb = Platform.OS === "web";
+
+  // On web: inject CSS @font-face aliases so that "Inter_700Bold" etc. always
+  // resolve to a visible system font even when the Google Fonts CDN is blocked.
+  useEffect(() => {
+    if (!isWeb) return;
+    const style = document.createElement("style");
+    style.textContent = `
+      @font-face { font-family: 'Inter_400Regular'; src: local('Inter'), local('Inter Regular'), local('Helvetica Neue'), local('Arial'); font-weight: 400; }
+      @font-face { font-family: 'Inter_500Medium';  src: local('Inter Medium'), local('Inter'), local('Helvetica Neue'), local('Arial'); font-weight: 500; }
+      @font-face { font-family: 'Inter_600SemiBold';src: local('Inter SemiBold'), local('Inter'), local('Helvetica Neue'), local('Arial'); font-weight: 600; }
+      @font-face { font-family: 'Inter_700Bold';    src: local('Inter Bold'), local('Inter'), local('Helvetica Neue'), local('Arial'); font-weight: 700; }
+    `;
+    document.head.appendChild(style);
+    return () => { style.remove(); };
+  }, [isWeb]);
+
+  // On web: render immediately (fonts are handled by CSS above).
+  // On native: wait up to 3s then render anyway to avoid a permanent blank screen.
   const [fontTimeout, setFontTimeout] = useState(isWeb);
   useEffect(() => {
     if (isWeb) return;

@@ -8,6 +8,7 @@ import {
   persistThreatProfile,
   persistPosition,
   persistSanctionsHit,
+  fetchAllVesselProfiles,
 } from "@/lib/persistence";
 
 export type { ThreatLevel, AnomalyFlag };
@@ -60,6 +61,34 @@ export function AISProvider({ children }: { children: React.ReactNode }) {
   const addViolation = useCallback((v: Violation) => {
     setViolations((prev) => [...prev.slice(-99), v]);
   }, []);
+
+  // ── Hydrate from Supabase on mount ──────────────────────────────────────
+  useEffect(() => {
+    fetchAllVesselProfiles().then((rows: any[]) => {
+      if (!rows.length) return;
+      const vesselMap: Record<string, Vessel> = {};
+      const profileMap: Record<string, ThreatProfile> = {};
+      for (const r of rows) {
+        vesselMap[r.mmsi] = {
+          mmsi:      r.mmsi,
+          name:      r.vessel_name || r.mmsi,
+          lat:       r.last_lat  ?? 0,
+          lon:       r.last_lon  ?? 0,
+          speed:     r.last_speed   ?? 0,
+          heading:   r.last_heading ?? 0,
+          timestamp: Date.now(),
+        };
+        profileMap[r.mmsi] = {
+          mmsi:        r.mmsi,
+          threatLevel: r.threat_level ?? "CLEAN",
+          score:       r.score ?? 0,
+          flags:       r.flags ?? [],
+        };
+      }
+      setVessels((prev) => ({ ...vesselMap, ...prev }));
+      setThreatProfiles((prev) => ({ ...profileMap, ...prev }));
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const domain = process.env.EXPO_PUBLIC_DOMAIN;

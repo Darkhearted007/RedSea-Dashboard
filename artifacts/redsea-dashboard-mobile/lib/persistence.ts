@@ -8,6 +8,17 @@ const BASE_URL = (): string => {
 const lastPositionWrite = new Map<string, number>()
 const POSITION_WRITE_INTERVAL_MS = 60_000
 
+export async function fetchAllVesselProfiles(limit = 500): Promise<any[]> {
+  try {
+    const url = `${BASE_URL()}/api/vessels?limit=${limit}`
+    const res = await fetch(url)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
 export async function persistViolation(
   mmsi: string,
   flag: AnomalyFlag,

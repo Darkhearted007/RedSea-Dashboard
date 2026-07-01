@@ -1,0 +1,3 @@
+- [Expo web font fallback](expo-web-font-fallback.md) — Inter_700Bold etc. render invisible on web unless @font-face CSS aliases are injected at runtime.
+- [Supabase vessel hydration](supabase-vessel-hydration.md) — Both web and mobile must call fetchAllVesselProfiles on mount or vessels show 0 on first load.
+- [Mobile API vessel endpoint](mobile-api-vessel-endpoint.md) — Mobile has no direct Supabase client; vessel data comes via /api/vessels on the API server.

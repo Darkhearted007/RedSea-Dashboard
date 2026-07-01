@@ -113,6 +113,17 @@ export async function fetchTopThreats(limit = 20) {
   return data || []
 }
 
+export async function fetchAllVesselProfiles(limit = 500) {
+  const { data, error } = await supabase
+    .from("vessel_threat_profiles")
+    .select("*")
+    .order("score", { ascending: false })
+    .limit(limit)
+
+  if (error) console.error("❌ fetchAllVesselProfiles:", error.message)
+  return data || []
+}
+
 export async function fetchThreatProfile(mmsi: string) {
   const { data, error } = await supabase
     .from("vessel_threat_profiles")
