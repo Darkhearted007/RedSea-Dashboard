@@ -7,32 +7,13 @@ import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
-
-type TamperConfidence = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "DEFINITIVE";
-
-type AnalysisFlag = {
-  code: string;
-  confidence: TamperConfidence;
-  description: string;
-};
-
-type DocumentResult = {
-  fileName: string;
-  fileSize: number;
-  mimeType: string;
-  riskScore: number;
-  isTampered: boolean;
-  tamperConfidence: TamperConfidence;
-  fileHash: string;
-  flags: AnalysisFlag[];
-  analysedAt: number;
-};
-
-type RegistryEntry = {
-  documentId: string;
-  chainHash: string;
-  result: DocumentResult;
-};
+import {
+  analyseDocumentMobile,
+  registerDocumentResult,
+  getRegistryChain,
+} from "@/lib/documentTamperDetector";
+import type { DocumentAnalysisResult, TamperConfidence, DocumentRegistryEntry } from "@/lib/documentTamperDetector";
+import { persistDocumentResult } from "@/lib/persistence";
 
 const CONFIDENCE_COLORS: Record<TamperConfidence, string> = {
   NONE: "#00ff88",
@@ -41,65 +22,6 @@ const CONFIDENCE_COLORS: Record<TamperConfidence, string> = {
   HIGH: "#ff6600",
   DEFINITIVE: "#ff0033",
 };
-
-function simpleHash(input: string): string {
-  let h = 0xdeadbeef;
-  for (let i = 0; i < input.length; i++) {
-    h = Math.imul(h ^ input.charCodeAt(i), 2654435761);
-  }
-  h ^= h >>> 16;
-  return (h >>> 0).toString(16).padStart(8, "0").repeat(8);
-}
-
-function analyzeDocument(fileName: string, fileSize: number): DocumentResult {
-  const hash = simpleHash(`${fileName}:${fileSize}`);
-  const flags: AnalysisFlag[] = [];
-  let score = 0;
-
-  const name = fileName.toLowerCase();
-
-  if (fileSize > 5_000_000) {
-    score += 20;
-    flags.push({ code: "OVERSIZED", confidence: "MEDIUM", description: `File size ${(fileSize / 1e6).toFixed(1)} MB exceeds typical document bounds` });
-  }
-
-  if (name.includes("copy") || name.includes("edited") || name.includes("modified")) {
-    score += 35;
-    flags.push({ code: "SUSPICIOUS_FILENAME", confidence: "HIGH", description: "Filename suggests a copy or modified version" });
-  }
-
-  if (name.includes("bill_of_lading") || name.includes("bol") || name.includes("manifest")) {
-    if (fileSize < 50_000) {
-      score += 25;
-      flags.push({ code: "UNDERSIZED_CARGO_DOC", confidence: "MEDIUM", description: "Document is unusually small for its type" });
-    }
-  }
-
-  const hashVal = parseInt(hash.substring(0, 8), 16);
-  if (hashVal % 7 === 0) {
-    score += 15;
-    flags.push({ code: "METADATA_ANOMALY", confidence: "LOW", description: "Document metadata inconsistency detected" });
-  }
-
-  const isTampered = score >= 25;
-  const tamperConfidence: TamperConfidence =
-    score >= 80 ? "DEFINITIVE" :
-    score >= 50 ? "HIGH" :
-    score >= 25 ? "MEDIUM" :
-    score > 0 ? "LOW" : "NONE";
-
-  return {
-    fileName,
-    fileSize,
-    mimeType: name.endsWith(".pdf") ? "application/pdf" : "image/jpeg",
-    riskScore: score,
-    isTampered,
-    tamperConfidence,
-    fileHash: hash,
-    flags,
-    analysedAt: Date.now(),
-  };
-}
 
 function RiskBar({ score }: { score: number }) {
   const colors = useColors();
@@ -121,8 +43,8 @@ export default function DocumentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<DocumentResult | null>(null);
-  const [registry, setRegistry] = useState<RegistryEntry[]>([]);
+  const [result, setResult] = useState<DocumentAnalysisResult | null>(null);
+  const [registry, setRegistry] = useState<DocumentRegistryEntry[]>([]);
 
   const pickDocument = useCallback(async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -141,28 +63,33 @@ export default function DocumentsScreen() {
     setAnalyzing(true);
     setResult(null);
 
-    // Simulate analysis delay
     await new Promise((r) => setTimeout(r, 1200));
 
     const asset = picked.assets[0];
     const fileName = asset.fileName ?? asset.uri.split("/").pop() ?? "document.jpg";
     const fileSize = asset.fileSize ?? 200_000;
+    const mimeType = asset.mimeType ?? (fileName.endsWith(".pdf") ? "application/pdf" : "image/jpeg");
 
-    const analysis = analyzeDocument(fileName, fileSize);
+    // ── Run analysis via shared documentTamperDetector lib ──
+    const analysis = analyseDocumentMobile({ fileName, fileSize, mimeType });
 
-    const prevChain = registry[registry.length - 1];
-    const chainHash = simpleHash(`${prevChain?.chainHash ?? "genesis"}:${analysis.fileHash}`);
-    const entry: RegistryEntry = {
-      documentId: `DOC-${Date.now().toString(36).toUpperCase()}`,
-      chainHash,
-      result: analysis,
-    };
+    // ── Hash-chain registry via shared lib ──
+    const entry = registerDocumentResult(analysis);
 
-    setRegistry((prev) => [...prev, entry]);
+    // ── Persist to backend (mirrors web persistence.ts flow) ──
+    const chain = getRegistryChain();
+    const prev = chain.length >= 2 ? chain[chain.length - 2] : null;
+    persistDocumentResult(analysis, entry.chainHash, prev?.chainHash ?? "0".repeat(64));
+
+    setRegistry(getRegistryChain());
     setResult(analysis);
     setAnalyzing(false);
-    Haptics.notificationAsync(analysis.isTampered ? Haptics.NotificationFeedbackType.Error : Haptics.NotificationFeedbackType.Success);
-  }, [registry]);
+    Haptics.notificationAsync(
+      analysis.isTampered
+        ? Haptics.NotificationFeedbackType.Error
+        : Haptics.NotificationFeedbackType.Success
+    );
+  }, []);
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
@@ -214,7 +141,7 @@ export default function DocumentsScreen() {
                   {result.fileName}
                 </Text>
                 <Text style={[styles.resultMeta, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
-                  {(result.fileSize / 1024).toFixed(1)} KB · {new Date(result.analysedAt).toLocaleTimeString()}
+                  {(result.metadata.fileSize / 1024).toFixed(1)} KB · {new Date(result.analysedAt).toLocaleTimeString()}
                 </Text>
               </View>
               <View style={[styles.statusBadge, { backgroundColor: result.isTampered ? "#ff003322" : "#00ff8822", borderColor: result.isTampered ? "#ff003355" : "#00ff8855" }]}>
