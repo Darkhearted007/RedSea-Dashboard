@@ -16,7 +16,12 @@ type VesselType = (typeof VESSEL_TYPES)[number]
 function MapPanner({ lat, lon }: { lat: number; lon: number }) {
   const map = useMap()
   useEffect(() => {
-    if (lat !== 0 || lon !== 0) map.panTo([lat, lon], { animate: true, duration: 0.6 })
+    if (!isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) return
+    try {
+      map.panTo([lat, lon], { animate: true, duration: 0.6 })
+    } catch {
+      // map may not be ready yet — ignore
+    }
   }, [lat, lon, map])
   return null
 }
@@ -35,9 +40,12 @@ function VesselLayer({
   onSelectVessel: (mmsi: string) => void
 }) {
   const filtered = vessels.filter((v) => {
+    // Skip vessels with missing or invalid coordinates
+    if (!isFinite(v.lat) || !isFinite(v.lon)) return false
+    if (v.lat === 0 && v.lon === 0) return false
     const vType = v.vesselType || "OTHER"
     if (typeFilter.size > 0 && !typeFilter.has(vType)) return false
-    if (v.speed < minSpeed) return false
+    if (Number(v.speed) < minSpeed) return false
     if (countryFilter && v.flagState !== countryFilter) return false
     return true
   })
@@ -53,7 +61,10 @@ function VesselLayer({
         if (isSelected) return null // selected trail rendered separately below
         const isAlert = threatLevel === "HIGH" || threatLevel === "CRITICAL"
         if (!isAlert) return null // only show faint trails for alert vessels
-        const positions = v.path.map((p) => [p.lat, p.lon] as [number, number])
+        const positions = v.path
+          .filter((p) => isFinite(p.lat) && isFinite(p.lon))
+          .map((p) => [p.lat, p.lon] as [number, number])
+        if (positions.length < 2) return null
         return (
           <Polyline
             key={`trail-${v.mmsi}`}
@@ -69,8 +80,10 @@ function VesselLayer({
       {/* Selected vessel trail — bright + solid */}
       {filtered.map((v) => {
         if (v.mmsi !== selectedMmsi || v.path.length < 2) return null
-        const positions = v.path.map((p) => [p.lat, p.lon] as [number, number])
-        // Render trail in segments with decreasing opacity (newest = brightest)
+        const positions = v.path
+          .filter((p) => isFinite(p.lat) && isFinite(p.lon))
+          .map((p) => [p.lat, p.lon] as [number, number])
+        if (positions.length < 2) return null
         return (
           <Polyline
             key={`trail-selected-${v.mmsi}`}
