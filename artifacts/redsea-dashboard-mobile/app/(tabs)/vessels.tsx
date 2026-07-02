@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useMemo } from "react";
 import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +21,10 @@ function VesselRow({ vessel, profile }: { vessel: Vessel; profile?: ThreatProfil
   return (
     <TouchableOpacity
       style={[styles.row, { borderBottomColor: colors.border }]}
-      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push(`/vessel/${vessel.mmsi}`);
+      }}
       activeOpacity={0.7}
     >
       <View style={[styles.indicator, { backgroundColor: color }]} />

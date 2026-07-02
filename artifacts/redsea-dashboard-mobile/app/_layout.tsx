@@ -24,6 +24,17 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="vessel/[mmsi]"
+        options={{
+          headerShown: true,
+          title: "Vessel Detail",
+          headerStyle: { backgroundColor: "#0d1828" },
+          headerTintColor: "#00ffcc",
+          headerTitleStyle: { fontFamily: "Inter_600SemiBold", color: "#e2e8f0" },
+          headerBackTitle: "Vessels",
+        }}
+      />
     </Stack>
   );
 }
