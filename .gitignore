@@ -47,3 +47,16 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+.agents/
+
+# Secrets — never commit
+.env
+.env.*
+*.env
+
+# Build artefacts
+artifacts/*/dist/
+lib/*/dist/
+
+# Migration backup (original imported code — reference only, not deployed)
+.migration-backup/
