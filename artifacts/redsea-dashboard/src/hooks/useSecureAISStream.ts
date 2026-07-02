@@ -35,10 +35,10 @@ export const useSecureAISStream = () => {
       setVessels(rows.map((r: any) => ({
         mmsi:     r.mmsi,
         name:     r.vessel_name || r.mmsi,
-        lat:      r.last_lat  ?? 0,
-        lon:      r.last_lon  ?? 0,
-        speed:    r.last_speed   ?? 0,
-        heading:  r.last_heading ?? 0,
+        lat:      Number(r.last_lat)     || 0,
+        lon:      Number(r.last_lon)     || 0,
+        speed:    Number(r.last_speed)   || 0,
+        heading:  Number(r.last_heading) || 0,
         flagState: mmsiToCountry(r.mmsi),
       })))
       // Populate threat profiles
