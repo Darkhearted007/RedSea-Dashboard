@@ -44,14 +44,15 @@ export const useSecureAISStream = () => {
       // Populate threat profiles
       for (const r of rows) {
         upsertThreatProfile({
-          mmsi:        r.mmsi,
-          threatLevel: r.threat_level ?? "CLEAN",
-          score:       r.score ?? 0,
-          flags:       r.flags ?? [],
+          mmsi:          r.mmsi,
+          threatLevel:   r.threat_level ?? "CLEAN",
+          score:         r.score ?? 0,
+          flags:         r.flags ?? [],
+          lastEvaluated: Date.now(),
         })
       }
-      console.log(`✅ Hydrated ${rows.length} vessels from Supabase`)
-    }).catch((err: unknown) => console.warn("⚠️ Supabase hydration failed:", err))
+      console.log(`✅ Hydrated ${rows.length} vessels from API`)
+    }).catch((err: unknown) => console.warn("⚠️ Vessel hydration failed:", err))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react"
 import { Link } from "wouter"
-import { supabase } from "@/lib/supabase/client"
 
 type Status = "checking" | "online" | "pending" | "offline"
 
@@ -35,12 +34,10 @@ export default function HomePage() {
   const [vesselCount, setVesselCount] = useState(0)
 
   useEffect(() => {
-    supabase
-      .from("port_intelligence")
-      .select("port_code", { count: "exact", head: true })
-      .then(({ error }) => {
-        setStatus(s => ({ ...s, api: error ? "offline" : "online" }))
-      })
+    fetch("/api/healthz")
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(() => setStatus(s => ({ ...s, api: "online" })))
+      .catch(() => setStatus(s => ({ ...s, api: "offline" })))
 
     const ws = new WebSocket("wss://stream.aisstream.io/v0/stream")
     const key = import.meta.env.VITE_AISSTREAM_API_KEY
@@ -112,7 +109,7 @@ export default function HomePage() {
         <div className="space-y-3 text-sm">
           {([
             ["Frontend",       status.frontend],
-            ["Supabase API",   status.api],
+            ["API Server",      status.api],
             ["AIS Stream",     status.ais],
             ["AI Engine",      status.ai],
           ] as [string, Status][]).map(([label, s]) => (

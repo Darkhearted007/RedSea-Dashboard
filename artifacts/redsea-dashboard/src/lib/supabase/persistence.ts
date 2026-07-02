@@ -1,11 +1,8 @@
 /**
  * RedSea Persistence Layer
- * All Supabase reads/writes in one place.
- * Uses anon key for reads, service_role (server-side) for writes.
- * Client-side writes go through Next.js API routes to avoid exposing service key.
+ * All reads/writes go through the API server — no direct Supabase access.
  */
 
-import { supabase } from "./client"
 import type { VesselThreatProfile, AnomalyFlag } from "@/lib/security/aisAnomalyDetector"
 import type { DocumentAnalysisResult } from "@/lib/security/documentTamperDetector"
 import type { SanctionHit } from "@/lib/intelligence/portIntelligence"
@@ -59,14 +56,13 @@ export async function persistViolation(
 }
 
 export async function fetchViolations(limit = 50) {
-  const { data, error } = await supabase
-    .from("violation_log")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit)
-
-  if (error) console.error("❌ fetchViolations:", error.message)
-  return data || []
+  try {
+    const res = await fetch(`/api/violations?limit=${limit}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 // ─── Vessel Threat Profiles ───────────────────────────────────────────────────
@@ -102,37 +98,34 @@ export async function persistThreatProfile(
 }
 
 export async function fetchTopThreats(limit = 20) {
-  const { data, error } = await supabase
-    .from("vessel_threat_profiles")
-    .select("*")
-    .in("threat_level", ["HIGH", "CRITICAL"])
-    .order("score", { ascending: false })
-    .limit(limit)
-
-  if (error) console.error("❌ fetchTopThreats:", error.message)
-  return data || []
+  try {
+    const res = await fetch(`/api/vessels/threats?limit=${limit}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 export async function fetchAllVesselProfiles(limit = 500) {
-  const { data, error } = await supabase
-    .from("vessel_threat_profiles")
-    .select("*")
-    .order("score", { ascending: false })
-    .limit(limit)
-
-  if (error) console.error("❌ fetchAllVesselProfiles:", error.message)
-  return data || []
+  try {
+    const res = await fetch(`/api/vessels?limit=${limit}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 export async function fetchThreatProfile(mmsi: string) {
-  const { data, error } = await supabase
-    .from("vessel_threat_profiles")
-    .select("*")
-    .eq("mmsi", mmsi)
-    .single()
-
-  if (error && error.code !== "PGRST116") console.error("❌ fetchThreatProfile:", error.message)
-  return data
+  try {
+    const res = await fetch(`/api/vessels/${encodeURIComponent(mmsi)}/profile`)
+    if (res.status === 404) return null
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 // ─── Document Registry ────────────────────────────────────────────────────────
@@ -167,48 +160,47 @@ export async function persistDocumentResult(
 }
 
 export async function fetchDocumentRegistry(limit = 20) {
-  const { data, error } = await supabase
-    .from("document_registry")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit)
-
-  if (error) console.error("❌ fetchDocumentRegistry:", error.message)
-  return data || []
+  try {
+    const res = await fetch(`/api/documents?limit=${limit}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 export async function fetchDocumentByHash(fileHash: string) {
-  const { data, error } = await supabase
-    .from("document_registry")
-    .select("*")
-    .eq("file_hash", fileHash)
-    .single()
-
-  if (error && error.code !== "PGRST116") console.error("❌ fetchDocumentByHash:", error.message)
-  return data
+  try {
+    const res = await fetch(`/api/documents/by-hash/${encodeURIComponent(fileHash)}`)
+    if (res.status === 404) return null
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 // ─── Port Intelligence ────────────────────────────────────────────────────────
 
 export async function fetchPortProfiles() {
-  const { data, error } = await supabase
-    .from("port_intelligence")
-    .select("*")
-    .order("risk_level", { ascending: false })
-
-  if (error) console.error("❌ fetchPortProfiles:", error.message)
-  return data || []
+  try {
+    const res = await fetch("/api/ports")
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 export async function fetchPortProfile(portCode: string) {
-  const { data, error } = await supabase
-    .from("port_intelligence")
-    .select("*")
-    .eq("port_code", portCode.toUpperCase())
-    .single()
-
-  if (error && error.code !== "PGRST116") console.error("❌ fetchPortProfile:", error.message)
-  return data
+  try {
+    const res = await fetch(`/api/ports/${encodeURIComponent(portCode)}`)
+    if (res.status === 404) return null
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
 }
 
 // ─── Sanctions Hits ───────────────────────────────────────────────────────────
@@ -238,22 +230,20 @@ export async function persistSanctionsHit(
 }
 
 export async function fetchSanctionsHistory(mmsi?: string) {
-  let query = supabase
-    .from("sanctions_hits")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50)
-
-  if (mmsi) query = query.eq("mmsi", mmsi)
-
-  const { data, error } = await query
-  if (error) console.error("❌ fetchSanctionsHistory:", error.message)
-  return data || []
+  try {
+    const url = mmsi
+      ? `/api/sanctions?mmsi=${encodeURIComponent(mmsi)}`
+      : "/api/sanctions"
+    const res = await fetch(url)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
-// ─── AIS Position History ─────────────────────────────────────────────────────
+// ─── AIS Positions ────────────────────────────────────────────────────────────
 
-// Throttled position writer — only writes every 60s per vessel to avoid flooding
 const lastPositionWrite = new Map<string, number>()
 const POSITION_WRITE_INTERVAL_MS = 60_000
 
@@ -261,7 +251,6 @@ export async function persistPosition(pos: DBPosition): Promise<void> {
   const now = Date.now()
   const last = lastPositionWrite.get(pos.mmsi) || 0
   if (now - last < POSITION_WRITE_INTERVAL_MS) return
-
   lastPositionWrite.set(pos.mmsi, now)
 
   try {
@@ -276,34 +265,29 @@ export async function persistPosition(pos: DBPosition): Promise<void> {
 }
 
 export async function fetchVesselTrack(mmsi: string, hours = 24) {
-  const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
-
-  const { data, error } = await supabase
-    .from("ais_positions")
-    .select("lat, lon, speed, heading, recorded_at")
-    .eq("mmsi", mmsi)
-    .gte("recorded_at", since)
-    .order("recorded_at", { ascending: true })
-
-  if (error) console.error("❌ fetchVesselTrack:", error.message)
-  return data || []
+  try {
+    const res = await fetch(`/api/vessels/${encodeURIComponent(mmsi)}/track?hours=${hours}`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
 }
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 
 export async function fetchDashboardStats() {
-  const [violations, threats, documents, sanctions] = await Promise.all([
-    supabase.from("violation_log").select("id", { count: "exact", head: true }),
-    supabase.from("vessel_threat_profiles").select("threat_level").in("threat_level", ["HIGH", "CRITICAL"]),
-    supabase.from("document_registry").select("is_tampered"),
-    supabase.from("sanctions_hits").select("id", { count: "exact", head: true }),
-  ])
-
-  return {
-    totalViolations: violations.count || 0,
-    activeHighThreats: threats.data?.length || 0,
-    documentsScanned: documents.data?.length || 0,
-    tamperedDocuments: documents.data?.filter(d => d.is_tampered).length || 0,
-    sanctionsHits: sanctions.count || 0,
+  try {
+    const res = await fetch("/api/dashboard/stats")
+    if (!res.ok) return {
+      totalViolations: 0, activeHighThreats: 0,
+      documentsScanned: 0, tamperedDocuments: 0, sanctionsHits: 0,
+    }
+    return await res.json()
+  } catch {
+    return {
+      totalViolations: 0, activeHighThreats: 0,
+      documentsScanned: 0, tamperedDocuments: 0, sanctionsHits: 0,
+    }
   }
 }
