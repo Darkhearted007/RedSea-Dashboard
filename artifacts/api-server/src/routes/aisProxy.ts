@@ -29,10 +29,16 @@ export function attachAISProxy(server: Server): void {
     const upstream = new WebSocket(AISSTREAM_URL);
 
     upstream.on("open", () => {
+      // Restrict to RedSea Ledger's operational area:
+      // Red Sea, Gulf of Aden, Arabian Sea, Persian Gulf, East African coast,
+      // western Indian Ocean shipping lanes.
       upstream.send(
         JSON.stringify({
           APIKey: API_KEY,
-          BoundingBoxes: [[[-90, -180], [90, 180]]],
+          BoundingBoxes: [
+            [[ -2, 25], [32, 80]], // Red Sea → Arabian Sea → Persian Gulf → western India coast
+            [[-15, 38], [ 2, 60]], // East African coast & Mozambique Channel
+          ],
           FilterMessageTypes: ["PositionReport", "ShipStaticData"],
         })
       );

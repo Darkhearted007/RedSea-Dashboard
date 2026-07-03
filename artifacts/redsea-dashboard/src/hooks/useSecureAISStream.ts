@@ -78,7 +78,10 @@ export const useSecureAISStream = () => {
         if (!useProxy) {
           ws.send(JSON.stringify({
             APIKey: DIRECT_API_KEY,
-            BoundingBoxes: [[[-90, -180], [90, 180]]],
+            BoundingBoxes: [
+              [[ -2, 25], [32, 80]],
+              [[-15, 38], [ 2, 60]],
+            ],
             FilterMessageTypes: ["PositionReport", "ShipStaticData"],
           }))
         }

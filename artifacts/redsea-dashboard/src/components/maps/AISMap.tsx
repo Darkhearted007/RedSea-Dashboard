@@ -202,8 +202,8 @@ export default function AISMap({
   return (
     <div className="relative w-full h-full">
       <MapContainer
-        center={[15, 45]}
-        zoom={5}
+        center={[18, 50]}
+        zoom={4}
         style={{ width: "100%", height: "100%", background: "#0b1220" }}
         attributionControl={false}
         zoomControl={false}
