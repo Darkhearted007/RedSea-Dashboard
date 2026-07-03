@@ -20,6 +20,10 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+// Stable empty map passed to useFonts on web so FontFaceObserver is never triggered.
+// A new object literal each render would cause unnecessary hook churn.
+const WEB_FONTS = {} as const;
+
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
@@ -42,11 +46,12 @@ function RootLayoutNav() {
 export default function RootLayout() {
   const isWeb = Platform.OS === "web";
 
-  // On web, pass an empty map so FontFaceObserver is never invoked.
+  // On web, pass a stable empty map so FontFaceObserver is never invoked.
   // Fonts are handled by the CSS @font-face injection below.
+  // The constant must be defined outside the component to keep identity stable.
   const [fontsLoaded, fontError] = useFonts(
     isWeb
-      ? {}
+      ? WEB_FONTS
       : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
   );
 

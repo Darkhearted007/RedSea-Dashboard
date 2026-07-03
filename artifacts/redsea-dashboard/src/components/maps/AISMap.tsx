@@ -62,7 +62,7 @@ function VesselLayer({
         const isAlert = threatLevel === "HIGH" || threatLevel === "CRITICAL"
         if (!isAlert) return null // only show faint trails for alert vessels
         const positions = v.path
-          .filter((p) => isFinite(p.lat) && isFinite(p.lon))
+          .filter((p) => isFinite(p.lat) && isFinite(p.lon) && !(p.lat === 0 && p.lon === 0))
           .map((p) => [p.lat, p.lon] as [number, number])
         if (positions.length < 2) return null
         return (
