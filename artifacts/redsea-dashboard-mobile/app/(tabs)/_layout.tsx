@@ -5,9 +5,18 @@ import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+
+// On web, Feather fonts load asynchronously and render as boxes on first paint.
+// Use emoji icons instead — they're immediate, zero-dependency, and look fine.
+const WEB_TAB_ICONS: Record<string, string> = {
+  overview:  "📊",
+  vessels:   "⛵",
+  ports:     "⚓",
+  documents: "📄",
+};
 
 function NativeTabLayout() {
   return (
@@ -64,7 +73,9 @@ function ClassicTabLayout() {
         options={{
           title: "Overview",
           tabBarIcon: ({ color }) =>
-            isIOS ? (
+            isWeb ? (
+              <Text style={{ fontSize: 20 }}>{WEB_TAB_ICONS.overview}</Text>
+            ) : isIOS ? (
               <SymbolView name="chart.bar.fill" tintColor={color} size={22} />
             ) : (
               <Feather name="activity" size={22} color={color} />
@@ -76,7 +87,9 @@ function ClassicTabLayout() {
         options={{
           title: "Vessels",
           tabBarIcon: ({ color }) =>
-            isIOS ? (
+            isWeb ? (
+              <Text style={{ fontSize: 20 }}>{WEB_TAB_ICONS.vessels}</Text>
+            ) : isIOS ? (
               <SymbolView name="sailboat.fill" tintColor={color} size={22} />
             ) : (
               <Feather name="navigation" size={22} color={color} />
@@ -88,7 +101,9 @@ function ClassicTabLayout() {
         options={{
           title: "Ports",
           tabBarIcon: ({ color }) =>
-            isIOS ? (
+            isWeb ? (
+              <Text style={{ fontSize: 20 }}>{WEB_TAB_ICONS.ports}</Text>
+            ) : isIOS ? (
               <SymbolView name="mappin.and.ellipse" tintColor={color} size={22} />
             ) : (
               <Feather name="anchor" size={22} color={color} />
@@ -100,7 +115,9 @@ function ClassicTabLayout() {
         options={{
           title: "Documents",
           tabBarIcon: ({ color }) =>
-            isIOS ? (
+            isWeb ? (
+              <Text style={{ fontSize: 20 }}>{WEB_TAB_ICONS.documents}</Text>
+            ) : isIOS ? (
               <SymbolView name="doc.text.fill" tintColor={color} size={22} />
             ) : (
               <Feather name="file-text" size={22} color={color} />
