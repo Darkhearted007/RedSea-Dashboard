@@ -40,14 +40,15 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-  });
-
   const isWeb = Platform.OS === "web";
+
+  // On web, pass an empty map so FontFaceObserver is never invoked.
+  // Fonts are handled by the CSS @font-face injection below.
+  const [fontsLoaded, fontError] = useFonts(
+    isWeb
+      ? {}
+      : { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
+  );
 
   // On web: inject CSS @font-face aliases so that "Inter_700Bold" etc. always
   // resolve to a visible system font even when the Google Fonts CDN is blocked.
