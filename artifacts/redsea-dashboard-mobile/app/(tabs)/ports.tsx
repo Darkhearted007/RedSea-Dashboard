@@ -256,7 +256,7 @@ function PortDetail({ port }: { port: PortProfile }) {
 
         <View style={styles.detailGrid}>
           {[
-            { label: "Coordinates", value: `${port.lat.toFixed(2)}°, ${port.lon.toFixed(2)}°` },
+            { label: "Coordinates", value: `${Number(port.lat).toFixed(2)}°, ${Number(port.lon).toFixed(2)}°` },
             { label: "Congestion", value: port.congestion ?? "N/A", color: port.congestion ? CONGESTION_COLORS[port.congestion] : undefined },
           ].map(({ label, value, color }) => (
             <View key={label} style={[styles.metaCell, { backgroundColor: colors.background }]}>

@@ -72,10 +72,12 @@ export function AISProvider({ children }: { children: React.ReactNode }) {
         vesselMap[r.mmsi] = {
           mmsi:      r.mmsi,
           name:      r.vessel_name || r.mmsi,
-          lat:       r.last_lat  ?? 0,
-          lon:       r.last_lon  ?? 0,
-          speed:     r.last_speed   ?? 0,
-          heading:   r.last_heading ?? 0,
+          // PostgreSQL numeric columns arrive as strings via the REST API —
+          // coerce to number here so .toFixed() and comparisons work everywhere.
+          lat:       Number(r.last_lat)     || 0,
+          lon:       Number(r.last_lon)     || 0,
+          speed:     Number(r.last_speed)   || 0,
+          heading:   Number(r.last_heading) || 0,
           timestamp: Date.now(),
         };
         profileMap[r.mmsi] = {
