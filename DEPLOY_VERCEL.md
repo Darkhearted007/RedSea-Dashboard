@@ -78,7 +78,7 @@ Vercel will:
 1. Install pnpm 11.5.2 and workspace dependencies (`npm install -g pnpm@11.5.2 && pnpm install --frozen-lockfile`).
 2. Build the frontend (`pnpm --filter @workspace/redsea-dashboard build`).
 3. Bundle the API serverless function (`api/index.ts`).
-4. Serve static assets from `artifacts/redsea-dashboard/public/`.
+4. Serve static assets from `artifacts/redsea-dashboard/dist/`.
 5. Route all `/api/*` requests to the serverless function.
 
 ---

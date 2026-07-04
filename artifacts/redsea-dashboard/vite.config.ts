@@ -46,10 +46,8 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   root: path.resolve(import.meta.dirname),
-  // Prevent Vite's static publicDir from colliding with the configured build outDir.
-  publicDir: false,
   build: {
-    outDir: path.resolve(import.meta.dirname, "public"),
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
   server: {
