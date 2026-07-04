@@ -6,7 +6,7 @@
 
   "buildCommand": "pnpm --filter @workspace/redsea-dashboard build",
 
-  "outputDirectory": "artifacts/redsea-dashboard/dist/public",
+  "outputDirectory": "artifacts/redsea-dashboard/public",
 
   "functions": {
     "api/index.ts": {
