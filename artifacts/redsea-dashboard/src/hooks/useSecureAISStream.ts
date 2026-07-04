@@ -83,6 +83,11 @@ export const useSecureAISStream = () => {
               [[ -2,  25], [32,  80]],   // Red Sea / Arabian Sea / Persian Gulf
               [[-15,  38], [ 2,  60]],   // East African coast & Mozambique Channel
 
+              // ── West Africa & Gulf of Guinea (dedicated box) ───────────────
+              // Nigeria (4–14°N, 3–15°E), Cameroon, Gabon, Equatorial Guinea,
+              // São Tomé, Ghana, Côte d'Ivoire, Liberia, Sierra Leone, Guinea.
+              [[ -5, -25], [25,  15]],
+
               // ── North Atlantic ─────────────────────────────────────────────
               [[ 25, -80], [65,  15]],   // US East Coast → Northern Europe → West Africa
 

@@ -29,7 +29,7 @@ export function attachAISProxy(server: Server): void {
     const upstream = new WebSocket(AISSTREAM_URL);
 
     upstream.on("open", () => {
-      // Operational areas — Red Sea / Indian Ocean (original) + full Atlantic
+      // Operational areas — Red Sea / Indian Ocean + full Atlantic + Gulf of Guinea
       // BoundingBoxes format: [[lat_min, lon_min], [lat_max, lon_max]]
       upstream.send(
         JSON.stringify({
@@ -38,6 +38,13 @@ export function attachAISProxy(server: Server): void {
             // ── Original: Red Sea → Arabian Sea → Persian Gulf ──────────────
             [[ -2,  25], [32,  80]],   // Red Sea / Arabian Sea / Persian Gulf
             [[-15,  38], [ 2,  60]],   // East African coast & Mozambique Channel
+
+            // ── West Africa & Gulf of Guinea (dedicated box) ─────────────────
+            // Fills the gap between the North Atlantic (starts 25°N) and South
+            // Atlantic (ends 5°N) boxes.  Covers Nigeria (4–14°N, 3–15°E),
+            // Cameroon, Gabon, Equatorial Guinea, São Tomé, Ghana, Côte
+            // d'Ivoire, Liberia, Sierra Leone, Guinea, Guinea-Bissau, Senegal.
+            [[ -5, -25], [25,  15]],
 
             // ── North Atlantic ───────────────────────────────────────────────
             [[ 25, -80], [65,  15]],   // US East Coast → Northern Europe → West Africa
