@@ -22,6 +22,9 @@ export type Vessel = {
   speed: number;
   heading: number;
   timestamp: number;
+  flagState?: string;
+  destination?: string;
+  vesselType?: string;
 };
 
 export type ThreatProfile = VesselThreatProfile;
@@ -81,10 +84,11 @@ export function AISProvider({ children }: { children: React.ReactNode }) {
           timestamp: Date.now(),
         };
         profileMap[r.mmsi] = {
-          mmsi:        r.mmsi,
-          threatLevel: r.threat_level ?? "CLEAN",
-          score:       r.score ?? 0,
-          flags:       r.flags ?? [],
+          mmsi:          r.mmsi,
+          threatLevel:   r.threat_level ?? "CLEAN",
+          score:         r.score ?? 0,
+          flags:         r.flags ?? [],
+          lastEvaluated: r.last_evaluated ? new Date(r.last_evaluated).getTime() : Date.now(),
         };
       }
       setVessels((prev) => ({ ...vesselMap, ...prev }));
