@@ -46,10 +46,12 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
   },
   root: path.resolve(import.meta.dirname),
-  // Prevent Vite's static publicDir from colliding with the configured build outDir.
+  // No static-asset publicDir needed; keeps the build self-contained.
   publicDir: false,
   build: {
-    outDir: path.resolve(import.meta.dirname, "public"),
+    // Output to the repo root public/ directory so Vercel's outputDirectory
+    // setting ("public") resolves correctly regardless of project structure.
+    outDir: path.resolve(import.meta.dirname, "../../public"),
     emptyOutDir: true,
   },
   server: {
