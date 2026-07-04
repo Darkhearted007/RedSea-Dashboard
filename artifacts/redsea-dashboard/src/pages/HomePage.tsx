@@ -54,6 +54,11 @@ export default function HomePage() {
     const directUrl = "wss://stream.aisstream.io/v0/stream"
     const directKey = import.meta.env.VITE_AISSTREAM_API_KEY as string | undefined
 
+    // How long to wait for the proxy to open before switching to direct (ms)
+    const PROXY_CONNECT_TIMEOUT_MS = 4_000
+    // Overall AIS probe deadline — settle on "pending" if no vessel received (ms)
+    const OVERALL_TIMEOUT_MS = 12_000
+
     // Bounding boxes covering the main shipping lanes monitored by the platform
     // Format: [[lat_min, lon_min], [lat_max, lon_max]] — matches aisProxy.ts
     const BOUNDING_BOXES = [
@@ -109,10 +114,10 @@ export default function HomePage() {
       ws.onerror   = () => setStatus(s => ({ ...s, ais: "offline" }))
     }
 
-    // Try proxy first; if it doesn't open within 4 s, fall back to direct
+    // Try proxy first; if it doesn't open within PROXY_CONNECT_TIMEOUT_MS, fall back to direct
     const proxyConnectTimeout = setTimeout(() => {
       if (!hasFallenBack) fallbackToDirect()
-    }, 4000)
+    }, PROXY_CONNECT_TIMEOUT_MS)
 
     ws = new WebSocket(proxyUrl)
     ws.onopen = () => {
@@ -122,7 +127,7 @@ export default function HomePage() {
     ws.onmessage = onMessage
     ws.onerror   = () => { clearTimeout(proxyConnectTimeout); fallbackToDirect() }
 
-    // Overall 12 s deadline — if no vessel received, settle on pending
+    // Overall deadline — if no vessel received, settle on pending
     const wsTimeout = setTimeout(() => {
       clearTimeout(proxyConnectTimeout)
       setStatus(s => ({
@@ -130,7 +135,7 @@ export default function HomePage() {
         ais: s.ais === "checking" || s.ais === "pending" ? "pending" : s.ais,
       }))
       ws?.close()
-    }, 12000)
+    }, OVERALL_TIMEOUT_MS)
 
     return () => {
       clearTimeout(proxyConnectTimeout)
