@@ -55,39 +55,15 @@ export default function HomePage() {
     const directKey = import.meta.env.VITE_AISSTREAM_API_KEY as string | undefined
 
     // Bounding boxes covering the main shipping lanes monitored by the platform
+    // Format: [[lat_min, lon_min], [lat_max, lon_max]] — matches aisProxy.ts
     const BOUNDING_BOXES = [
       [[ -2,  25], [32,  80]],  // Red Sea / Arabian Sea / Persian Gulf
       [[ -5, -25], [25,  15]],  // West Africa & Gulf of Guinea
       [[ 25, -80], [65,  15]],  // North Atlantic
     ]
 
-    let ws = new WebSocket(proxyUrl)
-
-    const openProxy = () => {
-      // Proxy handles auth server-side — no key needed from client
-      setStatus(s => ({ ...s, ais: "pending" }))
-    }
-
-    const fallbackToDirect = () => {
-      ws = new WebSocket(directUrl)
-      ws.onopen    = openDirect
-      ws.onmessage = onMessage
-      ws.onerror   = () => setStatus(s => ({ ...s, ais: "offline" }))
-    }
-
-    const openDirect = () => {
-      if (!directKey) {
-        // No API key available — leave status as pending
-        setStatus(s => ({ ...s, ais: "pending" }))
-        return
-      }
-      ws.send(JSON.stringify({
-        APIKey: directKey,
-        BoundingBoxes: BOUNDING_BOXES,
-        FilterMessageTypes: ["PositionReport"],
-      }))
-      setStatus(s => ({ ...s, ais: "pending" }))
-    }
+    let ws: WebSocket | null = null
+    let hasFallenBack = false
 
     const onMessage = (e: MessageEvent) => {
       try {
@@ -95,39 +71,71 @@ export default function HomePage() {
         if (msg.MessageType === "PositionReport") {
           setStatus(s => ({ ...s, ais: "online" }))
           setVesselCount(c => c + 1)
-          ws.close()
           clearTimeout(proxyConnectTimeout)
           clearTimeout(wsTimeout)
+          ws?.close()
         }
       } catch {}
     }
 
-    // If proxy doesn't connect within 4 s, fall back to direct stream
-    const proxyConnectTimeout = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        ws.close()
-        fallbackToDirect()
+    const fallbackToDirect = () => {
+      if (hasFallenBack) return
+      hasFallenBack = true
+
+      // Detach handlers from the proxy socket before discarding it
+      if (ws) {
+        ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close()
+        }
       }
+
+      if (!directKey) {
+        // No API key available — mark as pending, cannot probe further
+        setStatus(s => ({ ...s, ais: "pending" }))
+        return
+      }
+
+      ws = new WebSocket(directUrl)
+      ws.onopen = () => {
+        ws!.send(JSON.stringify({
+          APIKey: directKey,
+          BoundingBoxes: BOUNDING_BOXES,
+          FilterMessageTypes: ["PositionReport"],
+        }))
+        setStatus(s => ({ ...s, ais: "pending" }))
+      }
+      ws.onmessage = onMessage
+      ws.onerror   = () => setStatus(s => ({ ...s, ais: "offline" }))
+    }
+
+    // Try proxy first; if it doesn't open within 4 s, fall back to direct
+    const proxyConnectTimeout = setTimeout(() => {
+      if (!hasFallenBack) fallbackToDirect()
     }, 4000)
 
-    ws.onopen    = openProxy
+    ws = new WebSocket(proxyUrl)
+    ws.onopen = () => {
+      // Proxy handles auth server-side — no key needed from client
+      setStatus(s => ({ ...s, ais: "pending" }))
+    }
     ws.onmessage = onMessage
     ws.onerror   = () => { clearTimeout(proxyConnectTimeout); fallbackToDirect() }
 
-    // Overall 12 s deadline — if no vessel received, mark as pending
+    // Overall 12 s deadline — if no vessel received, settle on pending
     const wsTimeout = setTimeout(() => {
       clearTimeout(proxyConnectTimeout)
       setStatus(s => ({
         ...s,
         ais: s.ais === "checking" || s.ais === "pending" ? "pending" : s.ais,
       }))
-      ws.close()
+      ws?.close()
     }, 12000)
 
     return () => {
       clearTimeout(proxyConnectTimeout)
       clearTimeout(wsTimeout)
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         ws.close()
       }
     }
