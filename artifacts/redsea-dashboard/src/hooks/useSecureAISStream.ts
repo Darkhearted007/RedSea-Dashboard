@@ -79,8 +79,23 @@ export const useSecureAISStream = () => {
           ws.send(JSON.stringify({
             APIKey: DIRECT_API_KEY,
             BoundingBoxes: [
-              [[ -2, 25], [32, 80]],
-              [[-15, 38], [ 2, 60]],
+              // ── Original: Red Sea / Indian Ocean ──────────────────────────
+              [[ -2,  25], [32,  80]],   // Red Sea / Arabian Sea / Persian Gulf
+              [[-15,  38], [ 2,  60]],   // East African coast & Mozambique Channel
+
+              // ── West Africa & Gulf of Guinea (dedicated box) ───────────────
+              // Nigeria (4–14°N, 3–15°E), Cameroon, Gabon, Equatorial Guinea,
+              // São Tomé, Ghana, Côte d'Ivoire, Liberia, Sierra Leone, Guinea.
+              [[ -5, -25], [25,  15]],
+
+              // ── North Atlantic ─────────────────────────────────────────────
+              [[ 25, -80], [65,  15]],   // US East Coast → Northern Europe → West Africa
+
+              // ── South Atlantic ─────────────────────────────────────────────
+              [[-55, -70], [ 5,  20]],   // South America → South Africa (Atlantic)
+
+              // ── Gulf of Mexico & Caribbean ─────────────────────────────────
+              [[ 10, -100], [32, -60]],  // Gulf of Mexico, Caribbean Sea
             ],
             FilterMessageTypes: ["PositionReport", "ShipStaticData"],
           }))

@@ -96,11 +96,56 @@ const RISK_COLORS = {
   CRITICAL: "#ff0033",
 }
 
-const KNOWN_PORTS = ["NGLAG", "GHTEM", "KETIZ", "ZADUR", "IRBAN", "SYJDH"]
+const PORT_REGIONS: { label: string; ports: string[] }[] = [
+  {
+    label: "🇳🇬 Nigeria",
+    ports: ["NGLAG", "NGTIK", "NGPHC", "NGBON", "NGONE", "NGWAR", "NGCBQ", "NGESC", "NGBRS", "NGFCD", "NGKKO"],
+  },
+  {
+    label: "🌍 Gulf of Guinea",
+    ports: ["GHTEM", "TGLFW", "BJCOO", "CMDLA", "GQSSG", "GQBSG", "GALBV", "GAPOG", "STSAO"],
+  },
+  {
+    label: "🌍 West Africa",
+    ports: ["GNCKR", "GBBSX", "SLFTW", "LRMRV", "CIABJ", "SNDKR"],
+  },
+  {
+    label: "🌍 East & South Africa",
+    ports: ["KETIZ", "ZADUR", "ZACPT"],
+  },
+  {
+    label: "🌊 Red Sea & Middle East",
+    ports: ["IRBAN", "SYJDH", "AEDXB", "YEPOD", "EGPSD"],
+  },
+  {
+    label: "🌍 Mediterranean & N. Africa",
+    ports: ["MAPTM", "TRTRI", "LYTIP", "ESBCN", "ESALG", "PTLIS"],
+  },
+  {
+    label: "🇪🇺 Europe",
+    ports: ["NLRTM", "BEANR", "DEHAM", "FRLEH", "GBFXT", "GBSOU"],
+  },
+  {
+    label: "🌎 North America",
+    ports: ["USNYC", "USSAV", "USBLT", "USORF", "USMIA", "USCHS", "CAHFX"],
+  },
+  {
+    label: "🌎 Caribbean & Central America",
+    ports: ["JMKIN", "TTPOS", "COBAQ", "PAMIT", "MXVER", "CUHAV"],
+  },
+  {
+    label: "🌎 South America",
+    ports: ["BRSSZ", "BRRJN", "ARBUE", "CLVAP", "COCAR"],
+  },
+]
+
+// Flat list used for backward-compat lookups (vesselIntel defaultPorts etc.)
+const KNOWN_PORTS = PORT_REGIONS.flatMap((r) => r.ports)
 
 export default function PortsPage() {
   const [selectedPort, setSelectedPort] = useState<string | null>(null)
   const [selectedMMSI, setSelectedMMSI] = useState("")
+  const [search, setSearch] = useState("")
   const vessels = useVesselStore((s) => s.vessels)
   const { threatProfiles } = useSecurityStore()
 
@@ -111,7 +156,7 @@ export default function PortsPage() {
 
   const vesselIntel = useMemo(() => {
     if (!selectedMMSI) return null
-    return enrichVesselIntelligence(selectedMMSI, undefined, ["NGLAG", "IRBAN", "SYJDH"])
+    return enrichVesselIntelligence(selectedMMSI, undefined, ["NGLAG", "NGPHC", "IRBAN", "SYJDH"])
   }, [selectedMMSI])
 
   const intelSummary = useMemo(() => {
@@ -122,48 +167,81 @@ export default function PortsPage() {
 
   const trackedVesselList = useMemo(() => Object.values(vessels).slice(0, 20), [vessels])
 
+  const filteredRegions = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return PORT_REGIONS
+    return PORT_REGIONS.map((region) => ({
+      ...region,
+      ports: region.ports.filter((code) => {
+        const p = resolvePortProfile(code)
+        return (
+          p.name.toLowerCase().includes(q) ||
+          p.country.toLowerCase().includes(q) ||
+          code.toLowerCase().includes(q)
+        )
+      }),
+    })).filter((r) => r.ports.length > 0)
+  }, [search])
+
   return (
     <div className="p-6 space-y-6 text-[#e2e8f0] min-h-screen bg-[#0b1220]">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Port Intelligence</h1>
         <p className="text-sm text-[#4a6080] mt-1">
-          OSINT enrichment, sanctions screening, and port risk profiles
+          OSINT enrichment, sanctions screening, and port risk profiles — {KNOWN_PORTS.length} ports indexed
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#162033] rounded-xl border border-[#1e2d45]">
-          <div className="px-5 py-4 border-b border-[#1e2d45]">
+        <div className="bg-[#162033] rounded-xl border border-[#1e2d45] flex flex-col">
+          <div className="px-5 py-4 border-b border-[#1e2d45] space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-widest text-[#4a6080]">
               Port Risk Database
             </h2>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search port name, country or code…"
+              className="w-full bg-[#0b1220] border border-[#1e2d45] rounded-lg px-3 py-2 text-sm text-[#e2e8f0] placeholder-[#4a6080] focus:outline-none focus:border-[#00ffcc]"
+            />
           </div>
-          <div className="divide-y divide-[#1e2d45]">
-            {KNOWN_PORTS.map((code) => {
-              const p = resolvePortProfile(code)
-              return (
-                <button
-                  key={code}
-                  onClick={() => setSelectedPort(code)}
-                  className="w-full px-5 py-3 flex items-center justify-between hover:bg-[#1a2840] transition-colors text-left"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{p.name}</p>
-                    <p className="text-xs text-[#4a6080]">{p.country} · {code}</p>
-                  </div>
-                  <span
-                    className="text-xs font-mono px-2 py-0.5 rounded"
-                    style={{
-                      color: RISK_COLORS[p.riskLevel],
-                      backgroundColor: RISK_COLORS[p.riskLevel] + "22",
-                      border: `1px solid ${RISK_COLORS[p.riskLevel]}44`,
-                    }}
-                  >
-                    {p.riskLevel}
-                  </span>
-                </button>
-              )
-            })}
+          <div className="overflow-y-auto max-h-[70vh] divide-y divide-[#1e2d45]">
+            {filteredRegions.map((region) => (
+              <div key={region.label}>
+                <div className="px-5 py-2 bg-[#0d1824] sticky top-0 z-10">
+                  <p className="text-xs font-semibold text-[#4a6080] uppercase tracking-widest">
+                    {region.label}
+                  </p>
+                </div>
+                {region.ports.map((code) => {
+                  const p = resolvePortProfile(code)
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => setSelectedPort(code)}
+                      className="w-full px-5 py-3 flex items-center justify-between hover:bg-[#1a2840] transition-colors text-left"
+                      style={selectedPort === code ? { background: "#1a2840" } : undefined}
+                    >
+                      <div>
+                        <p className="text-sm font-medium">{p.name}</p>
+                        <p className="text-xs text-[#4a6080]">{p.country} · {code}</p>
+                      </div>
+                      <span
+                        className="text-xs font-mono px-2 py-0.5 rounded shrink-0"
+                        style={{
+                          color: RISK_COLORS[p.riskLevel],
+                          backgroundColor: RISK_COLORS[p.riskLevel] + "22",
+                          border: `1px solid ${RISK_COLORS[p.riskLevel]}44`,
+                        }}
+                      >
+                        {p.riskLevel}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </div>
         </div>
 
