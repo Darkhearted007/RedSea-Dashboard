@@ -16,7 +16,7 @@ This guide walks you through hosting the full RedSea AI Platform on Vercel
 | Requirement | Notes |
 |---|---|
 | [Vercel account](https://vercel.com) | Free tier is sufficient |
-| pnpm ≥ 9 | Used by the workspace |
+| pnpm 11.x | The workspace uses `minimumReleaseAge` (pnpm ≥ 10.16) and `allowBuilds` (pnpm 11). The `installCommand` in `vercel.json` installs the correct version automatically. |
 | PostgreSQL database | Vercel Postgres, Supabase, Neon, or any external PG |
 | AIS Stream API key | Free at [aisstream.io](https://aisstream.io) |
 
@@ -75,7 +75,7 @@ Click **Deploy** in the Vercel dashboard, or push a commit to trigger automatic
 deployment.
 
 Vercel will:
-1. Install pnpm workspace dependencies (`pnpm install --frozen-lockfile`).
+1. Install pnpm 11.5.2 and workspace dependencies (`npm install -g pnpm@11.5.2 && pnpm install --frozen-lockfile`).
 2. Build the frontend (`pnpm --filter @workspace/redsea-dashboard build`).
 3. Bundle the API serverless function (`api/index.ts`).
 4. Serve static assets from `artifacts/redsea-dashboard/dist/public/`.
@@ -123,6 +123,7 @@ provision an SSL certificate automatically.
 
 | Symptom | Fix |
 |---|---|
+| Build fails: `Unknown field "minimumReleaseAge"` or `allowBuilds` | The `installCommand` pins pnpm to v11.5.2. If you've overridden `installCommand`, restore it to `npm install -g pnpm@11.5.2 && pnpm install --frozen-lockfile`. |
 | Build fails: `DATABASE_URL must be set` | Add `DATABASE_URL` env var in Vercel dashboard |
 | No vessels on map | Set `VITE_AISSTREAM_API_KEY` in Vercel dashboard |
 | 404 on `/dashboard/*` routes | Ensure `vercel.json` is committed at the repo root |
