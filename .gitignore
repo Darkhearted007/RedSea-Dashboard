@@ -57,6 +57,7 @@ Thumbs.db
 # Build artefacts
 artifacts/*/dist/
 lib/*/dist/
+/public/
 
 # Migration backup (original imported code — reference only, not deployed)
 .migration-backup/
