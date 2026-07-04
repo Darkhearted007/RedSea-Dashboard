@@ -34,52 +34,116 @@ export default function HomePage() {
   const [vesselCount, setVesselCount] = useState(0)
 
   useEffect(() => {
+    // ── API Server health ─────────────────────────────────────────────────────
     fetch("/api/healthz")
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(() => setStatus(s => ({ ...s, api: "online" })))
       .catch(() => setStatus(s => ({ ...s, api: "offline" })))
 
-    const ws = new WebSocket("wss://stream.aisstream.io/v0/stream")
-    const key = import.meta.env.VITE_AISSTREAM_API_KEY
-
-    ws.onopen = () => {
-      if (key) {
-        ws.send(JSON.stringify({
-          APIKey: key,
-          BoundingBoxes: [[[0, 0], [1, 1]]],
-          FilterMessageTypes: ["PositionReport"],
-        }))
-        setStatus(s => ({ ...s, ais: "pending" }))
-      }
-    }
-
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data)
-        if (msg.MessageType === "PositionReport") {
-          setStatus(s => ({ ...s, ais: "online" }))
-          setVesselCount(c => c + 1)
-          ws.close()
-        }
-      } catch {}
-    }
-
-    ws.onerror = () => setStatus(s => ({ ...s, ais: "offline" }))
-
-    const wsTimeout = setTimeout(() => {
-      setStatus(s => ({
-        ...s,
-        ais: s.ais === "checking" || s.ais === "pending" ? "pending" : s.ais,
-      }))
-      ws.close()
-    }, 8000)
-
+    // ── AI Engine health ──────────────────────────────────────────────────────
     fetch("/api/health/ai")
       .then(r => r.ok ? r.json() : null)
       .then(data => setStatus(s => ({ ...s, ai: data?.ok ? "online" : "offline" })))
       .catch(() => setStatus(s => ({ ...s, ai: "offline" })))
 
-    return () => { clearTimeout(wsTimeout); ws.readyState === 1 && ws.close() }
+    // ── AIS Stream probe — try server proxy first, fall back to direct ────────
+    const proxyUrl = (() => {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:"
+      return `${proto}//${location.host}/api/ais-stream`
+    })()
+    const directUrl = "wss://stream.aisstream.io/v0/stream"
+    const directKey = import.meta.env.VITE_AISSTREAM_API_KEY as string | undefined
+
+    // How long to wait for the proxy to open before switching to direct (ms)
+    const PROXY_CONNECT_TIMEOUT_MS = 4_000
+    // Overall AIS probe deadline — settle on "pending" if no vessel received (ms)
+    const OVERALL_TIMEOUT_MS = 12_000
+
+    // Bounding boxes covering the main shipping lanes monitored by the platform
+    // Format: [[lat_min, lon_min], [lat_max, lon_max]] — matches aisProxy.ts
+    const BOUNDING_BOXES = [
+      [[ -2,  25], [32,  80]],  // Red Sea / Arabian Sea / Persian Gulf
+      [[ -5, -25], [25,  15]],  // West Africa & Gulf of Guinea
+      [[ 25, -80], [65,  15]],  // North Atlantic
+    ]
+
+    let ws: WebSocket | null = null
+    let hasFallenBack = false
+
+    const onMessage = (e: MessageEvent) => {
+      try {
+        const msg = JSON.parse(typeof e.data === "string" ? e.data : "")
+        if (msg.MessageType === "PositionReport") {
+          setStatus(s => ({ ...s, ais: "online" }))
+          setVesselCount(c => c + 1)
+          clearTimeout(proxyConnectTimeout)
+          clearTimeout(wsTimeout)
+          ws?.close()
+        }
+      } catch {}
+    }
+
+    const fallbackToDirect = () => {
+      if (hasFallenBack) return
+      hasFallenBack = true
+
+      // Detach handlers from the proxy socket before discarding it
+      if (ws) {
+        ws.onopen = ws.onmessage = ws.onerror = ws.onclose = null
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close()
+        }
+      }
+
+      if (!directKey) {
+        // No API key available — mark as pending, cannot probe further
+        setStatus(s => ({ ...s, ais: "pending" }))
+        return
+      }
+
+      ws = new WebSocket(directUrl)
+      ws.onopen = () => {
+        ws!.send(JSON.stringify({
+          APIKey: directKey,
+          BoundingBoxes: BOUNDING_BOXES,
+          FilterMessageTypes: ["PositionReport"],
+        }))
+        setStatus(s => ({ ...s, ais: "pending" }))
+      }
+      ws.onmessage = onMessage
+      ws.onerror   = () => setStatus(s => ({ ...s, ais: "offline" }))
+    }
+
+    // Try proxy first; if it doesn't open within PROXY_CONNECT_TIMEOUT_MS, fall back to direct
+    const proxyConnectTimeout = setTimeout(() => {
+      if (!hasFallenBack) fallbackToDirect()
+    }, PROXY_CONNECT_TIMEOUT_MS)
+
+    ws = new WebSocket(proxyUrl)
+    ws.onopen = () => {
+      // Proxy handles auth server-side — no key needed from client
+      setStatus(s => ({ ...s, ais: "pending" }))
+    }
+    ws.onmessage = onMessage
+    ws.onerror   = () => { clearTimeout(proxyConnectTimeout); fallbackToDirect() }
+
+    // Overall deadline — if no vessel received, settle on pending
+    const wsTimeout = setTimeout(() => {
+      clearTimeout(proxyConnectTimeout)
+      setStatus(s => ({
+        ...s,
+        ais: s.ais === "checking" || s.ais === "pending" ? "pending" : s.ais,
+      }))
+      ws?.close()
+    }, OVERALL_TIMEOUT_MS)
+
+    return () => {
+      clearTimeout(proxyConnectTimeout)
+      clearTimeout(wsTimeout)
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close()
+      }
+    }
   }, [])
 
   const NAV = [
