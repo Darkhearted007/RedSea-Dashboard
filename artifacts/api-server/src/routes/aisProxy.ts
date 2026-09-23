@@ -94,7 +94,10 @@ export function attachAISProxy(server: Server): void {
       }
     }, CLIENT_IDLE_TIMEOUT_MS);
 
+    let cleanedUp = false;
     const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
       clearTimeout(idleTimer);
       if (upstream.readyState === WebSocket.OPEN || upstream.readyState === WebSocket.CONNECTING) {
         upstream.close();
