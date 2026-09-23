@@ -90,7 +90,7 @@ lib/
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `VITE_AISSTREAM_API_KEY` | Yes | aisstream.io API key for live AIS data |
+| `AISSTREAM_API_KEY` | Yes | aisstream.io API key for live AIS data |
 | `SESSION_SECRET` | Yes | Random string for session signing |
 
 ### Install and run

@@ -46,7 +46,7 @@ In **Project Settings → Environment Variables**, add:
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | ✅ | PostgreSQL connection string (e.g. `******host:5432/db?sslmode=require`) |
-| `VITE_AISSTREAM_API_KEY` | ✅ | AIS Stream API key from aisstream.io |
+| `AISSTREAM_API_KEY` | ✅ | AIS Stream API key from aisstream.io |
 | `VITE_SUPABASE_URL` | only if using Supabase | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | only if using Supabase | Supabase anon key |
 
@@ -104,7 +104,7 @@ Browser
   ├─ GET /api/vessels   ──►  Serverless Function (api/index.ts)
   │                           └─ Express router  ──►  PostgreSQL
   │
-  └─ WSS aisstream.io   ──►  Direct browser WebSocket (AIS live feed)
+  └─ WSS /api/ais-stream ──►  Server-side AIS proxy (credential stays server-side)
 ```
 
 The Express API handles all `/api/*` REST endpoints.  
@@ -125,6 +125,6 @@ provision an SSL certificate automatically.
 |---|---|
 | Build fails: `Unknown field "minimumReleaseAge"` or `allowBuilds` | The `installCommand` pins pnpm to v11.5.2. If you've overridden `installCommand`, restore it to `npm install -g pnpm@11.5.2 && pnpm install --frozen-lockfile`. |
 | Build fails: `DATABASE_URL must be set` | Add `DATABASE_URL` env var in Vercel dashboard |
-| No vessels on map | Set `VITE_AISSTREAM_API_KEY` in Vercel dashboard |
+| No vessels on map | Set `AISSTREAM_API_KEY` in Vercel dashboard |
 | 404 on `/dashboard/*` routes | Ensure `vercel.json` is committed at the repo root |
 | API returns 500 | Check function logs in **Vercel → Functions → View Logs** |

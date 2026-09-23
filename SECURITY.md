@@ -1,39 +1,35 @@
-# Security Policy
+# RedSea Ledger Security Policy
 
-## Supported Versions
+## Security baseline
 
-Only the current production release receives security updates.
+RedSea Ledger treats external AIS feeds, customer requests, webhooks, browser input, and third-party APIs as untrusted.
 
-## Reporting a Vulnerability
+Required controls:
 
-**Do not open a public GitHub issue for security vulnerabilities.**
+- Secrets must remain server-side. No `VITE_` or `NEXT_PUBLIC_` variable may contain a secret credential.
+- AISStream credentials are used only by the server-side bridge/proxy.
+- Customer API keys are high-entropy, stored hashed, revocable, and never returned after creation.
+- Public ingestion endpoints require authenticated HMAC signatures with timestamps and replay protection.
+- Database queries use parameterized SQL; untrusted identifiers are never interpolated into SQL values.
+- Customer-facing routes must enforce authentication and organization scoping.
+- Scheduler-only intelligence jobs must remain unreachable over external HTTP.
+- Public endpoints must expose only intentionally public data and must not disclose operational secrets.
+- External URLs must be fixed/allowlisted; user-controlled URLs must not be fetched server-side without explicit SSRF controls.
 
-If you discover a security vulnerability in RedSea Ledger, please report it responsibly:
+## Responsible disclosure
 
-1. Email your findings to the repository owner (see GitHub profile for contact)
-2. Include a description of the vulnerability, steps to reproduce, and potential impact
-3. Allow up to 72 hours for an initial response
-4. Do not disclose the vulnerability publicly until a fix has been released
+Do not open a public GitHub issue for a security vulnerability. Report privately to the repository owner with the affected route/file, impact, and reproduction details.
 
-We will acknowledge receipt, investigate promptly, and notify you when a fix is available. We appreciate responsible disclosure and will credit researchers where appropriate.
+## Pre-production security gate
 
-## Scope
+Before merging security changes:
 
-In scope:
-- API server authentication and authorisation bypass
-- SQL injection or database access issues
-- Sensitive data exposure (vessel data, user data, API keys)
-- AIS stream proxy security issues
+1. Run typecheck/build.
+2. Run dependency and secret scanning.
+3. Exercise every API route with anonymous, authenticated-member, and admin access where applicable.
+4. Verify scheduler routes return 404 to external callers.
+5. Verify webhook signatures reject missing, stale, modified, and replayed requests.
+6. Verify no browser bundle contains AISStream, database, service-role, Stripe, FlowPay, or other private credentials.
+7. Review logs for unexpected 4xx/5xx spikes.
 
-Out of scope:
-- Issues requiring physical access to the server
-- Social engineering attacks
-- Rate limiting on public endpoints without demonstrated impact
-- MetaMask browser extension errors (these are from the browser, not our code)
-
-## Security Design Notes
-
-- API keys (`VITE_AISSTREAM_API_KEY`, `SESSION_SECRET`) are stored in environment secrets, never in source code
-- The AIS stream API key is proxied server-side — the client never receives it
-- All database writes go through the API server; no direct database access from client code
-- The proprietary threat-scoring algorithms run server-side only
+Never treat a successful build as proof of security; pair automated checks with manual code review and targeted DAST.
