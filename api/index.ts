@@ -10,7 +10,7 @@
  *
  * Required environment variables (set in Vercel dashboard):
  *   DATABASE_URL          — PostgreSQL connection string
- *   VITE_AISSTREAM_API_KEY — AIS stream API key (also used server-side by the proxy)
+ *   AISSTREAM_API_KEY — AIS stream API key (also used server-side by the proxy)
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http"
