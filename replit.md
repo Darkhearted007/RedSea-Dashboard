@@ -42,7 +42,7 @@ Real-time maritime intelligence platform — AIS vessel tracking, threat detecti
 - **No direct Supabase access**: Originally used Supabase; fully migrated to Replit PostgreSQL. All data reads/writes go through the API server. The `supabase/` folder in the web app remains as a namespace (not the service).
 - **snake_case API contract**: API query routes map Drizzle camelCase back to snake_case to match the existing frontend consumers without requiring changes throughout.
 - **Mobile uses API server only**: Mobile app has no direct DB access; all persistence via `https://${EXPO_PUBLIC_DOMAIN}/api/...`.
-- **AIS stream requires key**: Live vessel tracking needs `VITE_AISSTREAM_API_KEY` (aisstream.io). Without it the map shows 0 vessels but loads correctly.
+- **AIS stream requires key**: Live vessel tracking needs `AISSTREAM_API_KEY` (aisstream.io). Without it the map shows 0 vessels but loads correctly.
 - **`.migration-backup/` workflows fail intentionally**: These are the original pre-migration files; their workflows point to the wrong workspace paths.
 
 ## Product
