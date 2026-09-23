@@ -1,195 +1,47 @@
 import { useEffect, useRef } from "react"
-import { useVesselStore } from "@/store/useVesselStore"
-import { useSecurityStore } from "@/store/useSecurityStore"
-import { evaluateVesselThreat } from "@/lib/security/aisAnomalyDetector"
-import { enrichVesselIntelligence } from "@/lib/intelligence/portIntelligence"
-import {
-  persistViolation,
-  persistThreatProfile,
-  persistPosition,
-  persistSanctionsHit,
-  fetchAllVesselProfiles,
-} from "@/lib/supabase/persistence"
-import { mmsiToCountry, vesselTypeLabel } from "@/lib/ais/midCodes"
+import { useVesselStore } from "@/stores/vesselStore"
 
 const PROXY_URL = (() => {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:"
-  return `${proto}//${location.host}/api/ais-stream`
+  const proto = typeof location !== "undefined" && location.protocol === "https:" ? "wss:" : "ws:"
+  return typeof location !== "undefined"
+    ? `${proto}//${location.host}/api/ais-stream`
+    : ""
 })()
-
-const DIRECT_URL = "wss://stream.aisstream.io/v0/stream"
-const DIRECT_API_KEY = import.meta.env.VITE_AISSTREAM_API_KEY || ""
 
 export const useSecureAISStream = () => {
   const updateVessel = useVesselStore((s) => s.updateVessel)
-  const updateVesselStatic = useVesselStore((s) => s.updateVesselStatic)
-  const setVessels = useVesselStore((s) => s.setVessels)
-  const { upsertThreatProfile, upsertIntelligence, addViolation } = useSecurityStore()
   const wsRef = useRef<WebSocket | null>(null)
 
-  // ── Hydrate from Supabase on mount ────────────────────────────────────────
   useEffect(() => {
-    fetchAllVesselProfiles().then((rows) => {
-      if (!rows.length) return
-      // Populate vessel store with seeded/persisted positions
-      setVessels(rows.map((r: any) => ({
-        mmsi:     r.mmsi,
-        name:     r.vessel_name || r.mmsi,
-        lat:      Number(r.last_lat)     || 0,
-        lon:      Number(r.last_lon)     || 0,
-        speed:    Number(r.last_speed)   || 0,
-        heading:  Number(r.last_heading) || 0,
-        flagState: mmsiToCountry(r.mmsi),
-      })))
-      // Populate threat profiles
-      for (const r of rows) {
-        upsertThreatProfile({
-          mmsi:          r.mmsi,
-          threatLevel:   r.threat_level ?? "CLEAN",
-          score:         r.score ?? 0,
-          flags:         r.flags ?? [],
-          lastEvaluated: Date.now(),
-        })
-      }
-      console.log(`✅ Hydrated ${rows.length} vessels from API`)
-    }).catch((err: unknown) => console.warn("⚠️ Vessel hydration failed:", err))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!PROXY_URL) return
 
-  useEffect(() => {
-    let reconnectTimeout: ReturnType<typeof setTimeout>
-    let useProxy = true
+    const ws = new WebSocket(PROXY_URL)
+    wsRef.current = ws
 
-    const connect = () => {
-      const url = useProxy ? PROXY_URL : DIRECT_URL
-      const ws = new WebSocket(url)
-      wsRef.current = ws
-
-      const connectTimeout = setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN) {
-          console.warn("⚠️ Proxy timeout — falling back to direct AIS stream")
-          ws.close()
-          useProxy = false
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(typeof event.data === "string" ? event.data : "")
+        if (message?.MessageType === "PositionReport") {
+          updateVessel(message)
         }
-      }, 4000)
-
-      ws.onopen = () => {
-        clearTimeout(connectTimeout)
-        console.log(`✅ AIS stream connected (${useProxy ? "proxy" : "direct"})`)
-        if (!useProxy) {
-          ws.send(JSON.stringify({
-            APIKey: DIRECT_API_KEY,
-            BoundingBoxes: [
-              // ── Original: Red Sea / Indian Ocean ──────────────────────────
-              [[ -2,  25], [32,  80]],   // Red Sea / Arabian Sea / Persian Gulf
-              [[-15,  38], [ 2,  60]],   // East African coast & Mozambique Channel
-
-              // ── West Africa & Gulf of Guinea (dedicated box) ───────────────
-              // Nigeria (4–14°N, 3–15°E), Cameroon, Gabon, Equatorial Guinea,
-              // São Tomé, Ghana, Côte d'Ivoire, Liberia, Sierra Leone, Guinea.
-              [[ -5, -25], [25,  15]],
-
-              // ── North Atlantic ─────────────────────────────────────────────
-              [[ 25, -80], [65,  15]],   // US East Coast → Northern Europe → West Africa
-
-              // ── South Atlantic ─────────────────────────────────────────────
-              [[-55, -70], [ 5,  20]],   // South America → South Africa (Atlantic)
-
-              // ── Gulf of Mexico & Caribbean ─────────────────────────────────
-              [[ 10, -100], [32, -60]],  // Gulf of Mexico, Caribbean Sea
-            ],
-            FilterMessageTypes: ["PositionReport", "ShipStaticData"],
-          }))
-        }
-      }
-
-      ws.onmessage = async (event) => {
-        try {
-          const text = event.data instanceof Blob
-            ? await event.data.text()
-            : event.data
-          const raw = JSON.parse(text)
-
-          const messageType: string = raw.MessageType
-          const meta = raw.MetaData
-          if (!meta) return
-
-          const mmsi = String(meta.MMSI)
-
-          if (messageType === "ShipStaticData") {
-            const s = raw.Message?.ShipStaticData
-            if (!s) return
-            const typeCode = Number(s.TypeOfShipAndCargoType ?? 0)
-            const flagState = mmsiToCountry(mmsi)
-            updateVesselStatic(mmsi, {
-              name: s.Name?.trim() || undefined,
-              vesselType: vesselTypeLabel(typeCode),
-              flagState,
-              destination: s.Destination?.trim() || undefined,
-            })
-            return
-          }
-
-          if (messageType !== "PositionReport") return
-
-          const pos = raw.Message?.PositionReport
-          if (!pos) return
-
-          const vessel = {
-            mmsi,
-            name: meta.ShipName?.trim() || mmsi,
-            lat: meta.latitude ?? pos.Latitude,
-            lon: meta.longitude ?? pos.Longitude,
-            speed: pos.Sog ?? 0,
-            heading: pos.TrueHeading !== 511 ? (pos.TrueHeading ?? pos.Cog ?? 0) : (pos.Cog ?? 0),
-            timestamp: Date.now(),
-            flagState: mmsiToCountry(mmsi),
-          }
-
-          if (vessel.lat === 0 && vessel.lon === 0) return
-
-          updateVessel(vessel)
-
-          const threatProfile = evaluateVesselThreat(vessel)
-          upsertThreatProfile(threatProfile)
-
-          if (threatProfile.threatLevel !== "CLEAN") {
-            persistThreatProfile(threatProfile, vessel.lat, vessel.lon, vessel.speed, vessel.heading, vessel.name)
-          }
-
-          for (const flag of threatProfile.flags) {
-            if (flag.severity === "HIGH" || flag.severity === "CRITICAL") {
-              addViolation({ clientId: mmsi, detail: `[${flag.severity}] ${flag.code}: ${flag.description}`, timestamp: Date.now() })
-              persistViolation(mmsi, flag, threatProfile.score, vessel.lat, vessel.lon)
-            }
-          }
-
-          const intel = enrichVesselIntelligence(mmsi, vessel.name)
-          upsertIntelligence(intel)
-
-          for (const hit of intel.sanctionHits) {
-            persistSanctionsHit(mmsi, vessel.name, hit)
-          }
-
-          persistPosition({ mmsi, lat: vessel.lat, lon: vessel.lon, speed: vessel.speed, heading: vessel.heading })
-
-        } catch (err) {
-          console.error("❌ AIS parse error:", err)
-        }
-      }
-
-      ws.onerror = () => {
-        if (useProxy) {
-          console.warn("⚠️ AIS proxy error — will retry direct")
-          useProxy = false
-        }
-      }
-      ws.onclose = (e) => {
-        console.warn(`⚠️ AIS stream closed (${e.code}) — reconnecting in 5s`)
-        reconnectTimeout = setTimeout(connect, 5000)
+      } catch {
+        // Ignore malformed provider messages at the UI boundary.
       }
     }
 
-    connect()
-    return () => { clearTimeout(reconnectTimeout); wsRef.current?.close() }
-  }, [updateVessel, updateVesselStatic, upsertThreatProfile, upsertIntelligence, addViolation])
+    ws.onclose = () => {
+      if (wsRef.current === ws) wsRef.current = null
+    }
+
+    ws.onerror = () => {
+      ws.close()
+    }
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close()
+      }
+      if (wsRef.current === ws) wsRef.current = null
+    }
+  }, [updateVessel])
 }
